@@ -1,27 +1,26 @@
-﻿namespace SpreadsheetReader
+﻿namespace SpreadsheetReader;
+
+internal static class Program
 {
-    internal static class Program
+    static void Main(string[] args)
     {
-        static void Main(string[] args)
+        string? input;
+
+        while (true)
         {
-            string? input;
+            Console.WriteLine("Enter filename with file extension: ");
+            input = Console.ReadLine();
 
-            while (true)
+            if (File.Exists($"./{input}"))
             {
-                Console.WriteLine("Enter filename with file extension: ");
-                input = Console.ReadLine();
-
-                if (File.Exists($"./{input}"))
-                {
-                    Console.WriteLine("File found");
-                    break;
-                }
-                Console.WriteLine("File not found");
+                Console.WriteLine("File found");
+                break;
             }
-
-            SpreadsheetManager.ParseFile(input);
-            Console.ReadKey();
+            Console.WriteLine("File not found");
         }
 
+        SpreadsheetManager.ParseFile(input);
+        Console.ReadKey();
     }
+
 }
