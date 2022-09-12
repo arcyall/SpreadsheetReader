@@ -19,7 +19,7 @@ internal static class Program
             Console.WriteLine("File not found");
         }
 
-        SpreadsheetManager.ParseFile(input);
+        new SpreadsheetManager($"./{input}").ParseFile();
         Console.ReadKey();
     }
 
