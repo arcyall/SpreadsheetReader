@@ -1,10 +1,12 @@
 ﻿using Microsoft.Data.Sqlite;
 using NPOI.OOXML;
 using NPOI.OpenXmlFormats;
+using NPOI.SS.UserModel;
 using NPOI.XSSF.UserModel;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Data;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -30,7 +32,9 @@ public sealed class SpreadsheetManager
 
         switch (_filetype)
         {
-            //TODO: support more file types such as csv, ods, xls
+            //TODO: support more file types such as csv, ods
+            //TODO: db into spreadsheet support
+            case ".xls":
             case ".xlsx":
                 Console.WriteLine("Processing excel file");
                 ProcessSheet();
@@ -47,19 +51,56 @@ public sealed class SpreadsheetManager
     {
         // TODO: support multiple sheets per workbook
         using var stream = new FileStream(_path, FileMode.Open);
-        var workbook = new XSSFWorkbook(stream);
+
+        var workbook = WorkbookFactory.Create(stream);
+
         var sheet = workbook.GetSheetAt(0);
         var headerRow = sheet.GetRow(0);
-        
+
+        var table = new DataTable();
+        // populate datatable with columns from header row
         for (int i = 0; i < headerRow.LastCellNum; ++i)
         {
-            var cell = headerRow.GetCell(i);
-            Console.WriteLine(cell.ToString());
+            table.Columns.Add(headerRow.GetCell(i).ToString());
         }
 
-        //using var connection = new SqliteConnection($"Data Source={_name}.db");
-        //connection.Open();
+        // populate datatable rows with non-header rows
+        for (int i = sheet.FirstRowNum + 1; i <= sheet.LastRowNum; ++i)
+        {
+            var row = sheet.GetRow(i);
+            var tableRow = table.NewRow();
+            for (int j = 0; j < row.Cells.Count; ++j)
+            {
+                var cell = row.GetCell(j);
 
-        throw new NotImplementedException();
+                if (cell is not null)
+                {
+                    switch (cell.CellType)
+                    {
+                        case CellType.String:
+                            tableRow[j] = cell.StringCellValue;
+                            break;
+                        case CellType.Blank:
+                            tableRow[j] = string.Empty;
+                            break;
+                        case CellType.Numeric:
+                            tableRow[j] = DateUtil.IsCellDateFormatted(cell) ? cell.DateCellValue : cell.NumericCellValue;
+                            break;
+                        case CellType.Boolean:
+                            tableRow[j] = cell.BooleanCellValue;
+                            break;
+                    }
+                }
+            }
+            table.Rows.Add(tableRow);
+        }
+        WriteToDb(table);
+    }
+
+    private void WriteToDb(DataTable table)
+    {
+        Console.WriteLine("File parsed successfully, writing to database");
+        throw new NotImplementedException;
+        //using var stream = new SqliteConnection($"Data Source={_name}");
     }
 }

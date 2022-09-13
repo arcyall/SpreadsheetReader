@@ -1,8 +1,10 @@
-# ExcelReader
+﻿# ExcelReader
 
 
 
 ### TODO/Future Plans
-Support additional file formats<br>
-Dynamically generate database based on spreadsheet instead of hardcoding<br>
-Write database out into spreadsheet<br>
+<ul>
+	<li>Support additional file formats</li>
+	<li>~~Dynamically generate database based on spreadsheet instead of hardcoding~~ ✅ Done</li>
+	<li>Write database out into spreadsheet</li>
+</ul>
