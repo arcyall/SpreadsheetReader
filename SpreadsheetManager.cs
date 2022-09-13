@@ -1,15 +1,5 @@
-﻿using Microsoft.Data.Sqlite;
-using NPOI.OOXML;
-using NPOI.OpenXmlFormats;
-using NPOI.SS.UserModel;
-using NPOI.XSSF.UserModel;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
+﻿using NPOI.SS.UserModel;
 using System.Data;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SpreadsheetReader;
 
@@ -18,7 +8,7 @@ public sealed class SpreadsheetManager
     private readonly string _path;
     private readonly string _name;
     private readonly string _filetype;
-    
+
     public SpreadsheetManager(string path)
     {
         _path = path;
@@ -46,7 +36,7 @@ public sealed class SpreadsheetManager
                 break;
         }
     }
-    
+
     private void ProcessSheet()
     {
         // TODO: support multiple sheets per workbook
@@ -100,7 +90,7 @@ public sealed class SpreadsheetManager
     private void WriteToDb(DataTable table)
     {
         Console.WriteLine("File parsed successfully, writing to database");
-        throw new NotImplementedException;
+        throw new NotImplementedException();
         //using var stream = new SqliteConnection($"Data Source={_name}");
     }
 }

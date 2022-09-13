@@ -6,7 +6,7 @@ Place spreadsheet in same folder as executable, enter filename with file extensi
 **Currently only supports xlsx and xls.**
 
 
-### TODO/Future Plans
-- [ ] Support additional file formats
+## TODO/Future Plans
 - [x] Dynamically generate database based on spreadsheet instead of hardcoding
+- [ ] Support additional file formats
 - [ ] Write database out into spreadsheet
