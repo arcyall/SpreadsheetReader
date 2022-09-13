@@ -1,4 +1,5 @@
-﻿using NPOI.SS.UserModel;
+﻿using Microsoft.Data.Sqlite;
+using NPOI.SS.UserModel;
 using System.Data;
 
 namespace SpreadsheetReader;
@@ -43,11 +44,10 @@ public sealed class SpreadsheetManager
         using var stream = new FileStream(_path, FileMode.Open);
 
         var workbook = WorkbookFactory.Create(stream);
-
         var sheet = workbook.GetSheetAt(0);
         var headerRow = sheet.GetRow(0);
-
         var table = new DataTable();
+
         // populate datatable with columns from header row
         for (int i = 0; i < headerRow.LastCellNum; ++i)
         {
@@ -65,32 +65,38 @@ public sealed class SpreadsheetManager
 
                 if (cell is not null)
                 {
-                    switch (cell.CellType)
-                    {
-                        case CellType.String:
-                            tableRow[j] = cell.StringCellValue;
-                            break;
-                        case CellType.Blank:
-                            tableRow[j] = string.Empty;
-                            break;
-                        case CellType.Numeric:
-                            tableRow[j] = DateUtil.IsCellDateFormatted(cell) ? cell.DateCellValue : cell.NumericCellValue;
-                            break;
-                        case CellType.Boolean:
-                            tableRow[j] = cell.BooleanCellValue;
-                            break;
-                    }
+                    tableRow[j] = ParseType(cell);
                 }
             }
             table.Rows.Add(tableRow);
         }
         WriteToDb(table);
     }
-
+    private object ParseType(ICell cell)
+    {
+        object tableCell;
+        switch (cell.CellType)
+        {
+            case CellType.Blank:
+                tableCell = string.Empty;
+                return tableCell;
+            case CellType.Numeric:
+                tableCell = DateUtil.IsCellDateFormatted(cell) ? cell.DateCellValue : cell.NumericCellValue;
+                return tableCell;
+            case CellType.Boolean:
+                tableCell = cell.BooleanCellValue;
+                return tableCell;
+            default:
+                tableCell = cell.StringCellValue;
+                return tableCell;
+        }
+    }
     private void WriteToDb(DataTable table)
     {
         Console.WriteLine("File parsed successfully, writing to database");
         throw new NotImplementedException();
-        //using var stream = new SqliteConnection($"Data Source={_name}");
+
+        using var connection = new SqliteConnection($"Data Source={_name}.db");
+        connection.Open();
     }
 }
