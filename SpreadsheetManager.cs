@@ -1,6 +1,8 @@
 ﻿using Microsoft.Data.Sqlite;
+using Microsoft.VisualBasic;
 using NPOI.SS.UserModel;
 using System.Data;
+using System.Text;
 
 namespace SpreadsheetReader;
 
@@ -13,8 +15,8 @@ public sealed class SpreadsheetManager
     public SpreadsheetManager(string path)
     {
         _path = path;
-        _name = Path.GetFileName(path);
         _filetype = Path.GetExtension(path);
+        _name = Path.GetFileNameWithoutExtension(path);
     }
     public void ParseFile()
     {
@@ -41,62 +43,69 @@ public sealed class SpreadsheetManager
     private void ProcessSheet()
     {
         // TODO: support multiple sheets per workbook
-        using var stream = new FileStream(_path, FileMode.Open);
+        var createTableCmd = new StringBuilder($"CREATE TABLE IF NOT EXISTS {_name} (");
+        var fillTableCmd = new StringBuilder($"INSERT INTO {_name} (");
+        
 
-        var workbook = WorkbookFactory.Create(stream);
-        var sheet = workbook.GetSheetAt(0);
-        var headerRow = sheet.GetRow(0);
-        var table = new DataTable();
-
-        // populate datatable with columns from header row
-        for (int i = 0; i < headerRow.LastCellNum; ++i)
+        using (var stream = new FileStream(_path, FileMode.Open))
         {
-            table.Columns.Add(headerRow.GetCell(i).ToString());
-        }
+            var workbook = WorkbookFactory.Create(stream);
+            var sheet = workbook.GetSheetAt(0);
+            var headerRow = sheet.GetRow(sheet.FirstRowNum);
 
-        // populate datatable rows with non-header rows
-        for (int i = sheet.FirstRowNum + 1; i <= sheet.LastRowNum; ++i)
-        {
-            var row = sheet.GetRow(i);
-            var tableRow = table.NewRow();
-            for (int j = 0; j < row.Cells.Count; ++j)
+            for (int i = 0; i < headerRow.LastCellNum; ++i)
             {
-                var cell = row.GetCell(j);
-
-                if (cell is not null)
+                var currHeader = headerRow.GetCell(i).ToString().Replace(' ', '_');
+                var type = ParseType(sheet.GetRow(sheet.FirstRowNum + 1).GetCell(i).ToString());
+                createTableCmd.Append('[').Append(currHeader).Append("] ").Append(type);
+                fillTableCmd.Append(currHeader);
+                if (i < headerRow.LastCellNum - 1)
                 {
-                    tableRow[j] = ParseType(cell);
+                    createTableCmd.Append(',');
+                    fillTableCmd.Append(',');
                 }
             }
-            table.Rows.Add(tableRow);
-        }
-        WriteToDb(table);
-    }
-    private object ParseType(ICell cell)
-    {
-        object tableCell;
-        switch (cell.CellType)
-        {
-            case CellType.Blank:
-                tableCell = string.Empty;
-                return tableCell;
-            case CellType.Numeric:
-                tableCell = DateUtil.IsCellDateFormatted(cell) ? cell.DateCellValue : cell.NumericCellValue;
-                return tableCell;
-            case CellType.Boolean:
-                tableCell = cell.BooleanCellValue;
-                return tableCell;
-            default:
-                tableCell = cell.StringCellValue;
-                return tableCell;
-        }
-    }
-    private void WriteToDb(DataTable table)
-    {
-        Console.WriteLine("File parsed successfully, writing to database");
-        throw new NotImplementedException();
 
+            createTableCmd.Append(')');
+            fillTableCmd.Append(") VALUES (");
+
+            ExecuteDbCmd(createTableCmd.ToString());
+
+            var fillTableString = fillTableCmd.ToString();
+
+            for (int i = sheet.FirstRowNum + 1; i < sheet.LastRowNum; ++i)
+            {
+                var fillTableCmdTmp = new StringBuilder(fillTableString);
+                var currRow = sheet.GetRow(i);
+
+                for (int j = 0; j < currRow.Cells.Count; ++j)
+                {
+                    fillTableCmdTmp.Append(currRow.GetCell(j).ToString().Replace('-', '.'));
+                    if (j < currRow.Cells.Count - 1)
+                    {
+                        fillTableCmdTmp.Append(',');
+                    }
+                }
+                fillTableCmdTmp.Append(')');
+                ExecuteDbCmd(fillTableCmdTmp.ToString());
+            }
+        }
+    }
+    private string ParseType(string val)
+    {
+        if (String.IsNullOrEmpty(val) || String.IsNullOrWhiteSpace(val)) return null;
+        if (Int64.TryParse(val, out _)) return "BIGINT";
+        if (Decimal.TryParse(val, out _)) return "DECIMAL";
+        if (DateTime.TryParse(val, out _)) return "DATETIME";
+        return "NVARCHAR(255)";
+    }
+    private void ExecuteDbCmd(string cmd)
+    {
         using var connection = new SqliteConnection($"Data Source={_name}.db");
         connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = cmd;
+        Console.WriteLine(cmd);
+        command.ExecuteNonQuery();
     }
 }
