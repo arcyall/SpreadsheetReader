@@ -2,6 +2,7 @@
 using Microsoft.VisualBasic;
 using NPOI.SS.UserModel;
 using System.Data;
+using System.Linq.Expressions;
 using System.Text;
 
 namespace SpreadsheetReader;
@@ -16,7 +17,13 @@ public sealed class SpreadsheetManager
     {
         _path = path;
         _filetype = Path.GetExtension(path);
-        _name = Path.GetFileNameWithoutExtension(path);
+        _name = Path.GetFileNameWithoutExtension(path).Trim().Replace(' ', '_');
+
+        if (File.Exists($"./{_name}.db"))
+        {
+            File.Delete($"./{_name}.db");
+            Console.WriteLine($"Removed existing db file {_name}.db");
+        }
     }
     public void ParseFile()
     {
@@ -31,7 +38,6 @@ public sealed class SpreadsheetManager
             case ".xlsx":
                 Console.WriteLine("Processing excel file");
                 ProcessSheet();
-                Console.WriteLine("File fully loaded into db");
                 break;
 
             default:
@@ -43,19 +49,19 @@ public sealed class SpreadsheetManager
     private void ProcessSheet()
     {
         // TODO: support multiple sheets per workbook
-        var createTableCmd = new StringBuilder($"CREATE TABLE IF NOT EXISTS {_name} (");
+        var createTableCmd = new StringBuilder($"CREATE TABLE {_name} (");
         var fillTableCmd = new StringBuilder($"INSERT INTO {_name} (");
-        
 
-        using (var stream = new FileStream(_path, FileMode.Open))
+        try
         {
+            using var stream = new FileStream(_path, FileMode.Open);
             var workbook = WorkbookFactory.Create(stream);
             var sheet = workbook.GetSheetAt(0);
             var headerRow = sheet.GetRow(sheet.FirstRowNum);
 
             for (int i = 0; i < headerRow.LastCellNum; ++i)
             {
-                var currHeader = headerRow.GetCell(i).ToString().Replace(' ', '_');
+                var currHeader = headerRow.GetCell(i).ToString().Trim().Replace(' ', '_');
                 var type = ParseType(sheet.GetRow(sheet.FirstRowNum + 1).GetCell(i).ToString());
                 createTableCmd.Append('[').Append(currHeader).Append("] ").Append(type);
                 fillTableCmd.Append(currHeader);
@@ -80,7 +86,7 @@ public sealed class SpreadsheetManager
 
                 for (int j = 0; j < currRow.Cells.Count; ++j)
                 {
-                    fillTableCmdTmp.Append(currRow.GetCell(j).ToString().Replace('-', '.'));
+                    fillTableCmdTmp.Append('"').Append(currRow.GetCell(j).ToString()).Append('"');
                     if (j < currRow.Cells.Count - 1)
                     {
                         fillTableCmdTmp.Append(',');
@@ -89,11 +95,16 @@ public sealed class SpreadsheetManager
                 fillTableCmdTmp.Append(')');
                 ExecuteDbCmd(fillTableCmdTmp.ToString());
             }
+            Console.WriteLine("File fully loaded into db");
+        }
+        catch (IOException e)
+        {
+            Console.WriteLine("Error reading spreadsheet, it is most likely opened by another program.\n" + e);
         }
     }
     private string ParseType(string val)
     {
-        if (String.IsNullOrEmpty(val) || String.IsNullOrWhiteSpace(val)) return null;
+        if (String.IsNullOrEmpty(val) || String.IsNullOrWhiteSpace(val)) throw new Exception("Error: Tried to parse empty cell in spreadsheet");
         if (Int64.TryParse(val, out _)) return "BIGINT";
         if (Decimal.TryParse(val, out _)) return "DECIMAL";
         if (DateTime.TryParse(val, out _)) return "DATETIME";
@@ -105,7 +116,7 @@ public sealed class SpreadsheetManager
         connection.Open();
         using var command = connection.CreateCommand();
         command.CommandText = cmd;
-        Console.WriteLine(cmd);
-        command.ExecuteNonQuery();
+        Console.WriteLine("Executing: " + cmd);
+        command.ExecuteNonQueryAsync();
     }
 }

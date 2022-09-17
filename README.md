@@ -7,6 +7,6 @@ Place spreadsheet in same folder as executable, enter filename with file extensi
 
 
 ## TODO/Future Plans
-- [ ] Dynamically generate database based on spreadsheet instead of hardcoding
+- [x] Dynamically generate database based on spreadsheet instead of hardcoding
 - [ ] Support additional file formats
 - [ ] Write database out into spreadsheet
