@@ -33,8 +33,8 @@ public sealed class SpreadsheetManager
             //TODO: db into spreadsheet support
             case ".xls":
             case ".xlsx":
-                Console.WriteLine("Processing excel file");
-                ProcessSheet();
+                Console.WriteLine("Processing Office Open XML/Excel Binary File Format");
+                ProcessSpreadsheet();
                 break;
 
             default:
@@ -43,14 +43,14 @@ public sealed class SpreadsheetManager
         }
     }
 
-    private void ProcessSheet()
+    private void ProcessSpreadsheet()
     {
         try
         {
             using var stream = new FileStream(_path, FileMode.Open);
             var workbook = WorkbookFactory.Create(stream);
 
-            for (int x = 0; x < workbook.NumberOfSheets; ++x)
+            Parallel.For(0, workbook.NumberOfSheets, x =>
             {
                 var sheet = workbook.GetSheetAt(x);
                 var createTableCmd = new StringBuilder($"CREATE TABLE {sheet.SheetName} (");
@@ -94,7 +94,7 @@ public sealed class SpreadsheetManager
                     ExecuteDbCmd(fillTableCmdTmp.ToString());
                 }
                 Console.WriteLine("File fully loaded into db");
-            }
+            });
         }
         catch (IOException e)
         {
