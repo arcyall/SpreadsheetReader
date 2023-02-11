@@ -29,11 +29,9 @@ public sealed class SpreadsheetManager
 
         switch (_filetype)
         {
-            //TODO: support more file types such as csv, ods
-            //TODO: db into spreadsheet support
             case ".xls":
             case ".xlsx":
-                Console.WriteLine("Processing Office Open XML/Excel Binary File Format");
+                Console.WriteLine("Processing spreadsheet file");
                 ProcessSpreadsheet();
                 break;
 
@@ -49,6 +47,7 @@ public sealed class SpreadsheetManager
         {
             using var stream = new FileStream(_path, FileMode.Open);
             var workbook = WorkbookFactory.Create(stream);
+            var sqlCmd = new StringBuilder("BEGIN TRANSACTION;");
 
             Parallel.For(0, workbook.NumberOfSheets, x =>
             {
@@ -61,8 +60,10 @@ public sealed class SpreadsheetManager
                 {
                     var currHeader = headerRow.GetCell(i).ToString().Trim().Replace(' ', '_');
                     var type = ParseType(sheet.GetRow(sheet.FirstRowNum + 1).GetCell(i).ToString());
+
                     createTableCmd.Append('[').Append(currHeader).Append("] ").Append(type);
                     fillTableCmd.Append(currHeader);
+
                     if (i < headerRow.LastCellNum - 1)
                     {
                         createTableCmd.Append(',');
@@ -70,10 +71,12 @@ public sealed class SpreadsheetManager
                     }
                 }
 
-                createTableCmd.Append(')');
+                createTableCmd.Append(");");
                 fillTableCmd.Append(") VALUES (");
 
-                ExecuteDbCmd(createTableCmd.ToString());
+                Console.WriteLine(createTableCmd.ToString());
+
+                sqlCmd.Append(createTableCmd);
 
                 var fillTableString = fillTableCmd.ToString();
 
@@ -90,11 +93,16 @@ public sealed class SpreadsheetManager
                             fillTableCmdTmp.Append(',');
                         }
                     }
-                    fillTableCmdTmp.Append(')');
-                    ExecuteDbCmd(fillTableCmdTmp.ToString());
+                    fillTableCmdTmp.Append(");");
+                    sqlCmd.Append(fillTableCmdTmp);
                 }
-                Console.WriteLine("File fully loaded into db");
+                Console.WriteLine($"{sheet.SheetName} fully loaded into db");
             });
+
+            sqlCmd.Append("COMMIT;");
+            ExecuteDbCmd(sqlCmd.ToString());
+
+            Console.WriteLine("File fully loaded into db");
         }
         catch (IOException e)
         {
@@ -103,7 +111,7 @@ public sealed class SpreadsheetManager
     }
     private string ParseType(string val)
     {
-        if (String.IsNullOrEmpty(val) || String.IsNullOrWhiteSpace(val)) throw new Exception("Error: Tried to parse empty cell in spreadsheet");
+        if (String.IsNullOrEmpty(val) || String.IsNullOrWhiteSpace(val)) throw new ArgumentNullException(val, "Error: Tried to parse empty cell in spreadsheet");
         if (Int64.TryParse(val, out _)) return "BIGINT";
         if (Decimal.TryParse(val, out _)) return "DECIMAL";
         if (DateTime.TryParse(val, out _)) return "DATETIME";
@@ -115,7 +123,6 @@ public sealed class SpreadsheetManager
         connection.Open();
         using var command = connection.CreateCommand();
         command.CommandText = cmd;
-        Console.WriteLine("Executing: " + cmd);
         command.ExecuteNonQueryAsync();
     }
 }
