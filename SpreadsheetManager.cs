@@ -47,14 +47,14 @@ public sealed class SpreadsheetManager
         {
             using var stream = new FileStream(_path, FileMode.Open);
             var workbook = WorkbookFactory.Create(stream);
-            var sqlCmd = new StringBuilder("BEGIN TRANSACTION;");
+            var sqlCmd = new StringBuilder().AppendLine("BEGIN TRANSACTION;");
 
             Parallel.For(0, workbook.NumberOfSheets, x =>
             {
                 var sheet = workbook.GetSheetAt(x);
+                var headerRow = sheet.GetRow(sheet.FirstRowNum);
                 var createTableCmd = new StringBuilder($"CREATE TABLE {sheet.SheetName} (");
                 var fillTableCmd = new StringBuilder($"INSERT INTO {sheet.SheetName} (");
-                var headerRow = sheet.GetRow(sheet.FirstRowNum);
 
                 for (int i = 0; i < headerRow.LastCellNum; ++i)
                 {
@@ -72,44 +72,50 @@ public sealed class SpreadsheetManager
                 }
 
                 createTableCmd.Append(");");
+                lock (sqlCmd)
+                {
+                    sqlCmd.AppendLine(createTableCmd.ToString());
+                }
+                
                 fillTableCmd.Append(") VALUES (");
-
-                Console.WriteLine(createTableCmd.ToString());
-
-                sqlCmd.Append(createTableCmd);
-
                 var fillTableString = fillTableCmd.ToString();
 
                 for (int i = sheet.FirstRowNum + 1; i < sheet.LastRowNum; ++i)
                 {
-                    var fillTableCmdTmp = new StringBuilder(fillTableString);
+                    fillTableCmd.Clear();
+                    fillTableCmd.Append(fillTableString);
+
                     var currRow = sheet.GetRow(i);
 
                     for (int j = 0; j < currRow.Cells.Count; ++j)
                     {
-                        fillTableCmdTmp.Append('"').Append(currRow.GetCell(j).ToString()).Append('"');
+                        fillTableCmd.Append('"').Append(currRow.GetCell(j).ToString()).Append('"');
                         if (j < currRow.Cells.Count - 1)
                         {
-                            fillTableCmdTmp.Append(',');
+                            fillTableCmd.Append(',');
                         }
                     }
-                    fillTableCmdTmp.Append(");");
-                    sqlCmd.Append(fillTableCmdTmp);
+                    fillTableCmd.Append(");");
+                    lock (sqlCmd)
+                    {
+                        sqlCmd.AppendLine(fillTableCmd.ToString());
+                    }
                 }
-                Console.WriteLine($"{sheet.SheetName} fully loaded into db");
+                Console.WriteLine($"{sheet.SheetName} processed");
             });
 
-            sqlCmd.Append("COMMIT;");
+            sqlCmd.AppendLine("COMMIT;");
             ExecuteDbCmd(sqlCmd.ToString());
 
             Console.WriteLine("File fully loaded into db");
+            Console.WriteLine(sqlCmd);
         }
         catch (IOException e)
         {
             Console.WriteLine("Error reading spreadsheet, it is most likely opened by another program.\n" + e);
         }
     }
-    private string ParseType(string val)
+    private static string ParseType(string val)
     {
         if (String.IsNullOrEmpty(val) || String.IsNullOrWhiteSpace(val)) throw new ArgumentNullException(val, "Error: Tried to parse empty cell in spreadsheet");
         if (Int64.TryParse(val, out _)) return "BIGINT";
