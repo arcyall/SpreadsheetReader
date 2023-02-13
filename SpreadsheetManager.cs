@@ -71,18 +71,13 @@ public sealed class SpreadsheetManager
                     }
                 }
 
-                createTableCmd.Append(");");
-                lock (sqlCmd)
-                {
-                    sqlCmd.AppendLine(createTableCmd.ToString());
-                }
-                
+                createTableCmd.AppendLine(");");
                 fillTableCmd.Append(") VALUES (");
                 var fillTableString = fillTableCmd.ToString();
+                fillTableCmd.Clear();
 
                 for (int i = sheet.FirstRowNum + 1; i < sheet.LastRowNum; ++i)
                 {
-                    fillTableCmd.Clear();
                     fillTableCmd.Append(fillTableString);
 
                     var currRow = sheet.GetRow(i);
@@ -95,27 +90,29 @@ public sealed class SpreadsheetManager
                             fillTableCmd.Append(',');
                         }
                     }
-                    fillTableCmd.Append(");");
-                    lock (sqlCmd)
-                    {
-                        sqlCmd.AppendLine(fillTableCmd.ToString());
-                    }
+                    fillTableCmd.AppendLine(");");
                 }
+
+                lock (sqlCmd)
+                {
+                    sqlCmd.Append(createTableCmd.ToString());
+                    sqlCmd.Append(fillTableCmd.ToString());
+                }
+
                 Console.WriteLine($"{sheet.SheetName} processed");
             });
 
-            sqlCmd.AppendLine("COMMIT;");
+            sqlCmd.Append("COMMIT;");
             ExecuteDbCmd(sqlCmd.ToString());
-
-            Console.WriteLine("File fully loaded into db");
             Console.WriteLine(sqlCmd);
+            Console.WriteLine("File fully loaded into db");
         }
         catch (IOException e)
         {
             Console.WriteLine("Error reading spreadsheet, it is most likely opened by another program.\n" + e);
         }
     }
-    private static string ParseType(string val)
+    private static string ParseType(string? val)
     {
         if (String.IsNullOrEmpty(val) || String.IsNullOrWhiteSpace(val)) throw new ArgumentNullException(val, "Error: Tried to parse empty cell in spreadsheet");
         if (Int64.TryParse(val, out _)) return "BIGINT";
