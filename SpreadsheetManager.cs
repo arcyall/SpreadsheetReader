@@ -47,7 +47,7 @@ public sealed class SpreadsheetManager
         {
             using var stream = new FileStream(_path, FileMode.Open);
             var workbook = WorkbookFactory.Create(stream);
-            var sqlCmd = new StringBuilder().AppendLine("BEGIN TRANSACTION;");
+            var sqlCmds = new StringBuilder[workbook.NumberOfSheets];
 
             Parallel.For(0, workbook.NumberOfSheets, x =>
             {
@@ -58,7 +58,7 @@ public sealed class SpreadsheetManager
 
                 for (int i = 0; i < headerRow.LastCellNum; ++i)
                 {
-                    var currHeader = headerRow.GetCell(i).ToString().Trim().Replace(' ', '_');
+                    var currHeader = headerRow.GetCell(i).ToString()!.Trim().Replace(' ', '_');
                     var type = ParseType(sheet.GetRow(sheet.FirstRowNum + 1).GetCell(i).ToString());
 
                     createTableCmd.Append('[').Append(currHeader).Append("] ").Append(type);
@@ -93,39 +93,48 @@ public sealed class SpreadsheetManager
                     fillTableCmd.AppendLine(");");
                 }
 
-                lock (sqlCmd)
-                {
-                    sqlCmd.Append(createTableCmd.ToString());
-                    sqlCmd.Append(fillTableCmd.ToString());
-                }
+                var sqlCmd = new StringBuilder();
+
+                sqlCmd.Append(createTableCmd);
+                sqlCmd.Append(fillTableCmd);
+
+                sqlCmds[x] = sqlCmd;
 
                 Console.WriteLine($"{sheet.SheetName} processed");
             });
 
-            sqlCmd.Append("COMMIT;");
-            ExecuteDbCmd(sqlCmd.ToString());
-            Console.WriteLine(sqlCmd);
+            var finalSqlCmd = new StringBuilder().AppendLine("BEGIN TRANSACTION;");
+
+            foreach (var cmd in sqlCmds)
+            {
+                finalSqlCmd.Append(cmd);
+            }
+
+            using var connection = new SqliteConnection($"Data Source={_name}.db");
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = finalSqlCmd.AppendLine("COMMIT;").ToString();
+            command.ExecuteNonQuery();
+
             Console.WriteLine("File fully loaded into db");
         }
-        catch (IOException e)
+        catch (AccessViolationException e)
         {
             Console.WriteLine("Error reading spreadsheet, it is most likely opened by another program.\n" + e);
+        }
+        catch (FileNotFoundException e)
+        {
+            Console.WriteLine("That file does not exist.\n" + e);
         }
     }
     private static string ParseType(string? val)
     {
+
+        // TODO: handle more types
         if (String.IsNullOrEmpty(val) || String.IsNullOrWhiteSpace(val)) throw new ArgumentNullException(val, "Error: Tried to parse empty cell in spreadsheet");
         if (Int64.TryParse(val, out _)) return "BIGINT";
         if (Decimal.TryParse(val, out _)) return "DECIMAL";
         if (DateTime.TryParse(val, out _)) return "DATETIME";
         return "NVARCHAR(255)";
-    }
-    private void ExecuteDbCmd(string cmd)
-    {
-        using var connection = new SqliteConnection($"Data Source={_name}.db");
-        connection.Open();
-        using var command = connection.CreateCommand();
-        command.CommandText = cmd;
-        command.ExecuteNonQueryAsync();
     }
 }
