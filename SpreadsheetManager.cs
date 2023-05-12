@@ -124,13 +124,11 @@ public sealed class SpreadsheetManager
         }
         catch (FileNotFoundException e)
         {
-            Console.WriteLine("That file does not exist.\n" + e);
+            Console.WriteLine("File not found.\n" + e);
         }
     }
     private static string ParseType(string? val)
     {
-
-        // TODO: handle more types
         if (String.IsNullOrEmpty(val) || String.IsNullOrWhiteSpace(val)) throw new ArgumentNullException(val, "Error: Tried to parse empty cell in spreadsheet");
         if (Int64.TryParse(val, out _)) return "BIGINT";
         if (Decimal.TryParse(val, out _)) return "DECIMAL";
