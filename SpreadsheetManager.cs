@@ -9,23 +9,26 @@ public sealed class SpreadsheetManager
     private readonly string _path;
     private readonly string _name;
     private readonly string _filetype;
+    private readonly string _dest;
 
-    public SpreadsheetManager(string path)
+    public SpreadsheetManager(string path, string filename, string dest)
     {
-        _path = path;
-        _filetype = Path.GetExtension(path);
-        _name = Path.GetFileNameWithoutExtension(path).Trim().Replace(' ', '_');
+        _path = path + filename;
+        _dest = dest + '/';
+        _filetype = Path.GetExtension(filename);
+        _name = Path.GetFileNameWithoutExtension(filename).Trim().Replace(' ', '_');
 
-        if (File.Exists($"./{_name}.db"))
+        if (File.Exists($"{_dest}{_name}.db"))
         {
-            File.Delete($"./{_name}.db");
-            Console.WriteLine($"Removed existing db file {_name}.db");
+            File.Delete($"{_dest}{_name}.db");
+            Console.WriteLine($"Removed existing file {_name}.db at location {_dest}");
         }
     }
     public void ParseFile()
     {
-        Console.WriteLine($"Provided filename: {_name}");
-        Console.WriteLine($"Provided filetype: {_filetype}");
+        Console.WriteLine($"Filename: {_name}");
+        Console.WriteLine($"Filetype: {_filetype}");
+        Console.WriteLine($"Destination: {_dest}");
 
         switch (_filetype)
         {
@@ -110,7 +113,7 @@ public sealed class SpreadsheetManager
                 finalSqlCmd.Append(cmd);
             }
 
-            using var connection = new SqliteConnection($"Data Source={_name}.db");
+            using var connection = new SqliteConnection($"Data Source={_dest}{_name}.db");
             connection.Open();
             using var command = connection.CreateCommand();
             command.CommandText = finalSqlCmd.AppendLine("COMMIT;").ToString();
