@@ -1,6 +1,6 @@
-﻿# Readme
+﻿# SpreadsheetReader
 
-This repository contains code for a C# console application that reads an Excel spreadsheet file and loads it into an SQLite database. 
+This repository contains code for a .NET console application that reads an Excel spreadsheet file and loads it into an SQLite database. 
 
 ## Build
 
@@ -30,10 +30,6 @@ To read the file `employees.xlsx` located in the folder `C:\Users\Me\Documents`,
 ```
 SpreadsheetReader.exe employees.xlsx -path C:\Users\Me\Documents -dest C:\Users\Me\Documents
 ```
-
-## Contributing
-
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
 ## License
 
